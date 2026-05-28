@@ -899,29 +899,8 @@ popFilters();popMS();recompute();upSt();rndrOv();
 setTimeout(()=>$("ldr").classList.add("out"),500);
 setTimeout(()=>$("ldr").style.display="none",1100);
 </script>
-  <script >// --- AI WIDGET JS START ---
-// ⚠️ সতর্কতা: এটি শুধুমাত্র টেস্ট করার জন্য। পরে আমরা এটি Apps Script-এ সরিয়ে নেব।
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"; // আপনার জেনারেট করা Key এখানে দিন
-
-const chatWindow = document.getElementById('ai-chat-window');
-const chatMessages = document.getElementById('ai-chat-messages');
-const textInput = document.getElementById('ai-text-input');
-const micBtn = document.getElementById('ai-mic-btn');
-
-function toggleAIChat() {
-    if (chatWindow.style.display === "flex") { chatWindow.style.display = "none"; } 
-    else { chatWindow.style.display = "flex"; textInput.focus(); }
-}
-
-function handleEnter(e) { if (e.key === 'Enter') sendToAI(); }
-
-function appendMessage(text, sender) {
-    const msgDiv = document.createElement('div');
-    msgDiv.classList.add('chat-bubble', sender === 'user' ? 'user-msg' : 'ai-msg');
-    msgDiv.innerText = text;
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
+  <script > // আপনার কপি করা Apps Script URL-টি এখানে বসান
+const APPS_SCRIPT_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE"; 
 
 async function sendToAI() {
     const userText = textInput.value.trim();
@@ -939,27 +918,19 @@ async function sendToAI() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
-        // ড্যাশবোর্ডের কিছু ডেমো ডেটা AI কে পাঠানোর জন্য (যাতে সে উত্তর দিতে পারে)
-        const dashboardContext = `
-            You are a business assistant for Jus Jumpin.
-            Current context: The user is viewing the dashboard.
-            If the user asks in Bengali, reply in Bengali. Keep it professional and short.
-            User: ${userText}
-        `;
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // ডিরেক্ট Gemini-কে কল না করে, আমাদের সিকিউর Apps Script-কে কল করা হচ্ছে
+        const response = await fetch(APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: dashboardContext }] }] })
+            body: JSON.stringify({ message: userText }),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' } // CORS এরড় এড়াতে text/plain
         });
 
         const data = await response.json();
         document.getElementById(loadingId).remove();
 
-        if (data.candidates && data.candidates[0]) {
-            const aiReply = data.candidates[0].content.parts[0].text;
-            appendMessage(aiReply, 'ai');
-            speakText(aiReply);
+        if (data.reply) {
+            appendMessage(data.reply, 'ai');
+            speakText(data.reply);
         } else {
             appendMessage("দুঃখিত, কোনো একটি সমস্যা হয়েছে।", 'ai');
         }
@@ -968,31 +939,7 @@ async function sendToAI() {
         appendMessage("নেটওয়ার্ক এরর।", 'ai');
     }
 }
-
-function startVoiceRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("আপনার ব্রাউজার ভয়েস সাপোর্ট করে না। দয়া করে Chrome ব্যবহার করুন।"); return; }
     
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'bn-IN'; 
-    recognition.interimResults = false;
-
-    recognition.onstart = () => micBtn.classList.add('listening');
-    recognition.onspeechend = () => { micBtn.classList.remove('listening'); recognition.stop(); };
-    recognition.onresult = (event) => { textInput.value = event.results[0][0].transcript; sendToAI(); };
-    recognition.onerror = () => micBtn.classList.remove('listening');
-    
-    recognition.start();
-}
-
-function speakText(text) {
-    const cleanText = text.replace(/[*#]/g, ''); 
-    const speech = new SpeechSynthesisUtterance();
-    speech.text = cleanText;
-    speech.lang = 'bn-IN'; 
-    window.speechSynthesis.speak(speech);
-}
-// --- AI WIDGET JS END ---
   </script>
 <!-- --- AI WIDGET HTML START --- -->
 <div id="ai-widget-container">
