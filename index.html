@@ -5,7 +5,27 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Jus Jumpin — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
+<style>/* --- AI WIDGET CSS START --- */
+#ai-widget-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; font-family: 'Outfit', sans-serif; }
+#ai-fab { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, var(--cy), var(--or)); border: none; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 207, 255, 0.4); display: flex; justify-content: center; align-items: center; transition: transform 0.3s ease; }
+#ai-fab:hover { transform: scale(1.1); }
+#ai-fab svg { width: 30px; height: 30px; fill: white; }
+#ai-chat-window { position: absolute; bottom: 80px; right: 0; width: 350px; height: 500px; background: var(--sur); border: 1px solid var(--bdr); border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column; overflow: hidden; animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+#ai-chat-header { background: var(--card); padding: 15px; border-bottom: 1px solid var(--bdr); display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--cy); }
+#ai-close-btn { background: none; border: none; color: var(--tx); cursor: pointer; font-size: 18px; }
+#ai-chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.chat-bubble { max-width: 80%; padding: 10px 15px; border-radius: 12px; font-size: 14px; line-height: 1.4; }
+.user-msg { background: var(--cy); color: #000; align-self: flex-end; border-bottom-right-radius: 2px; }
+.ai-msg { background: var(--card); color: var(--tx); align-self: flex-start; border: 1px solid var(--bdr); border-bottom-left-radius: 2px; }
+#ai-input-area { padding: 10px; background: var(--card); border-top: 1px solid var(--bdr); display: flex; gap: 5px; align-items: center; }
+#ai-text-input { flex: 1; background: var(--bg); border: 1px solid var(--bdr); color: var(--tx); padding: 10px; border-radius: 20px; outline: none; font-family: inherit; }
+.ai-action-btn { background: var(--bdr); border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; color: var(--tx); transition: background 0.2s; }
+.ai-action-btn:hover { background: var(--cy); color: #000; }
+#ai-mic-btn.listening { background: var(--or); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+/* --- AI WIDGET CSS END --- */
+  
 :root{--bg:#07070f;--sur:#0f0f1a;--card:#161622;--bdr:#22223a;--bdr2:#2d2d48;
   --or:#ff6b2b;--or2:#ff9558;--cy:#00cfff;--gn:#00e5a0;--ye:#ffd93d;
   --rd:#ff4d6a;--pu:#b06ef5;--pk:#ff6eb4;--bl:#3b82f6;--tx:#eeeef8;--mu:#6868a0;--mu2:#9898c0}
@@ -879,4 +899,120 @@ popFilters();popMS();recompute();upSt();rndrOv();
 setTimeout(()=>$("ldr").classList.add("out"),500);
 setTimeout(()=>$("ldr").style.display="none",1100);
 </script>
+  <script >// --- AI WIDGET JS START ---
+// ⚠️ সতর্কতা: এটি শুধুমাত্র টেস্ট করার জন্য। পরে আমরা এটি Apps Script-এ সরিয়ে নেব।
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"; // আপনার জেনারেট করা Key এখানে দিন
+
+const chatWindow = document.getElementById('ai-chat-window');
+const chatMessages = document.getElementById('ai-chat-messages');
+const textInput = document.getElementById('ai-text-input');
+const micBtn = document.getElementById('ai-mic-btn');
+
+function toggleAIChat() {
+    if (chatWindow.style.display === "flex") { chatWindow.style.display = "none"; } 
+    else { chatWindow.style.display = "flex"; textInput.focus(); }
+}
+
+function handleEnter(e) { if (e.key === 'Enter') sendToAI(); }
+
+function appendMessage(text, sender) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('chat-bubble', sender === 'user' ? 'user-msg' : 'ai-msg');
+    msgDiv.innerText = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function sendToAI() {
+    const userText = textInput.value.trim();
+    if (!userText) return;
+
+    appendMessage(userText, 'user');
+    textInput.value = '';
+
+    const loadingId = 'loading-' + Date.now();
+    const msgDiv = document.createElement('div');
+    msgDiv.id = loadingId;
+    msgDiv.classList.add('chat-bubble', 'ai-msg');
+    msgDiv.innerText = "ভাবছি...";
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    try {
+        // ড্যাশবোর্ডের কিছু ডেমো ডেটা AI কে পাঠানোর জন্য (যাতে সে উত্তর দিতে পারে)
+        const dashboardContext = `
+            You are a business assistant for Jus Jumpin.
+            Current context: The user is viewing the dashboard.
+            If the user asks in Bengali, reply in Bengali. Keep it professional and short.
+            User: ${userText}
+        `;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: dashboardContext }] }] })
+        });
+
+        const data = await response.json();
+        document.getElementById(loadingId).remove();
+
+        if (data.candidates && data.candidates[0]) {
+            const aiReply = data.candidates[0].content.parts[0].text;
+            appendMessage(aiReply, 'ai');
+            speakText(aiReply);
+        } else {
+            appendMessage("দুঃখিত, কোনো একটি সমস্যা হয়েছে।", 'ai');
+        }
+    } catch (error) {
+        document.getElementById(loadingId).remove();
+        appendMessage("নেটওয়ার্ক এরর।", 'ai');
+    }
+}
+
+function startVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("আপনার ব্রাউজার ভয়েস সাপোর্ট করে না। দয়া করে Chrome ব্যবহার করুন।"); return; }
+    
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'bn-IN'; 
+    recognition.interimResults = false;
+
+    recognition.onstart = () => micBtn.classList.add('listening');
+    recognition.onspeechend = () => { micBtn.classList.remove('listening'); recognition.stop(); };
+    recognition.onresult = (event) => { textInput.value = event.results[0][0].transcript; sendToAI(); };
+    recognition.onerror = () => micBtn.classList.remove('listening');
+    
+    recognition.start();
+}
+
+function speakText(text) {
+    const cleanText = text.replace(/[*#]/g, ''); 
+    const speech = new SpeechSynthesisUtterance();
+    speech.text = cleanText;
+    speech.lang = 'bn-IN'; 
+    window.speechSynthesis.speak(speech);
+}
+// --- AI WIDGET JS END ---
+  </script>
+<!-- --- AI WIDGET HTML START --- -->
+<div id="ai-widget-container">
+    <button id="ai-fab" onclick="toggleAIChat()">
+        <svg viewBox="0 0 24 24"><path d="M12,2C6.48,2 2,6.48 2,12C2,17.52 6.48,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M11,16H13V18H11V16M12,6C10.34,6 9,7.34 9,9H11C11,8.45 11.45,8 12,8C12.55,8 13,8.45 13,9C13,10 11,9.75 11,13H13C13,10.75 15,10.5 15,9C15,7.34 13.66,6 12,6Z"/></svg>
+    </button>
+    <div id="ai-chat-window">
+        <div id="ai-chat-header">
+            <span>Jus Jumpin AI</span>
+            <button id="ai-close-btn" onclick="toggleAIChat()">✖</button>
+        </div>
+        <div id="ai-chat-messages">
+            <div class="chat-bubble ai-msg">Hello Sir! আমি আপনার AI Assistant. আজকের ড্যাশবোর্ড নিয়ে কী জানতে চান?</div>
+        </div>
+        <div id="ai-input-area">
+            <button id="ai-mic-btn" class="ai-action-btn" onclick="startVoiceRecognition()" title="কথা বলুন">🎤</button>
+            <input type="text" id="ai-text-input" placeholder="কিছু লিখুন..." onkeypress="handleEnter(event)">
+            <button id="ai-send-btn" class="ai-action-btn" onclick="sendToAI()" title="পাঠান">➤</button>
+        </div>
+    </div>
+</div>
+<!-- --- AI WIDGET HTML END --- -->
 </body></html>
